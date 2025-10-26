@@ -256,7 +256,17 @@
           addBubble(reply,'bot'); speak(reply);
         }
       };
-      recog.onerror = (e)=>{ setState('confused'); safeText(glyphText,'!'); addBubble('ASR: '+e.error); };
+      recog.onerror = (e)=>{
+        // Gestion douce des cas fréquents
+        if(e.error === 'no-speech' || e.error === 'audio-capture'){
+          // Pas de bulle bruyante : on repart en écoute automatiquement
+          setState('listening');
+          try { if(micActive) setTimeout(()=>{ try{recog.start();}catch{} }, 300); } catch {}
+          return;
+        }
+        setState('confused'); safeText(glyphText,'!');
+        addBubble('ASR: '+e.error);
+      };
       recog.onend = ()=>{ if(micActive){ try{recog.start();}catch{} } };
     }
     setupRecog();
