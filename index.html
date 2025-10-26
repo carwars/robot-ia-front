@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Robot IA – Dialogue vocal + Waveform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b1020;          /* fond app */
+      --panel:#111833;       /* panneaux */
+      --panel-2:#0d1329;     /* panneaux secondaires */
+      --accent:#62e0ff;      /* cyan froid */
+      --accent-2:#91ffb3;    /* vert doux */
+      --accent-warm:#ffc861; /* jaune orangé */
+      --danger:#ff667a;      /* rose/rouge */
+      --muted:#8aa0c8;       /* texte secondaire */
+      --ink:#e8eeff;         /* texte primaire */
+      --focus:#7aa2ff;       /* focus a11y */
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; color:var(--ink);
+      background:radial-gradient(1200px 600px at 70% -10%, #1b2350 0%, #0b1020 55%, #070b16 100%);
+    }
+    .app{display:grid; grid-template-columns:320px 1fr; grid-template-rows:auto 180px; gap:16px; padding:16px; height:100%;}
+    .panel{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid rgba(255,255,255,.05); border-radius:var(--radius); box-shadow:0 10px 30px rgba(0,0,0,.35);}
+
+    /* LEFT COLUMN */
+    .stack{display:grid; gap:16px}
+    .card{padding:18px; border-radius:var(--radius); background:linear-gradient(180deg,#131a3b,#0f1630); border:1px solid rgba(255,255,255,.06);}    
+    .title{font-weight:800; letter-spacing:.3px; font-size:14px; text-transform:uppercase; color:var(--muted); margin:0 0 12px}
+
+    .btn{appearance:none; border:0; border-radius:14px; padding:14px 16px; font-weight:700; font-size:16px; cursor:pointer; color:#08101f; background:var(--accent); width:100%; display:flex; align-items:center; justify-content:center; gap:10px}
+    .btn[aria-pressed="true"]{ background:linear-gradient(180deg,#18b6e6,#0abbd6); box-shadow:0 0 0 3px rgba(98,224,255,.25) inset, 0 8px 18px rgba(0,181,216,.35)}
+    .btn.secondary{ background:#202a58; color:var(--ink); border:1px solid rgba(255,255,255,.08)}
+    .btn:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
+
+    .row{display:flex; align-items:center; gap:14px}
+    .range{width:100%}
+    input[type="range"]{width:100%}
+    input[type="range"]{ -webkit-appearance:none; background:transparent; height:36px}
+    input[type="range"]:focus{outline:none}
+    input[type="range"]::-webkit-slider-runnable-track{height:6px; background:linear-gradient(90deg,var(--accent) 0%, var(--accent-2) 100%); border-radius:999px}
+    input[type="range"]::-moz-range-track{height:6px; background:linear-gradient(90deg,var(--accent) 0%, var(--accent-2) 100%); border-radius:999px}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none; margin-top:-7px; width:20px; height:20px; border-radius:50%; background:var(--ink); border:2px solid var(--panel); box-shadow:0 1px 8px rgba(0,0,0,.4)}
+    input[type="range"]::-moz-range-thumb{width:20px; height:20px; border-radius:50%; background:var(--ink); border:2px solid var(--panel)}
+
+    .icon{display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px}
+
+    .log{height:180px; overflow:auto; background:rgba(3,8,20,.4); border:1px solid rgba(255,255,255,.05); border-radius:14px; padding:8px}
+    .bubble{max-width:85%; padding:10px 12px; border-radius:14px; margin:6px 0; font-size:14px}
+    .b-user{ background:#203564; margin-left:auto; border:1px solid rgba(255,255,255,.06)}
+    .b-bot{ background:#14244a; border:1px solid rgba(255,255,255,.06)}
+
+    .composer{display:flex; gap:8px; margin-top:10px}
+    .composer input{flex:1; padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.1); background:#0c1330; color:var(--ink)}
+
+    /* ROBOT STAGE */
+    .stage{position:relative; padding:16px; display:grid; place-items:center}
+    .robot-wrap{width:100%; max-width:720px; aspect-ratio:16/9; border-radius:var(--radius); background:radial-gradient(120% 120% at 50% 20%, #22306b 0%, #10183a 60%, #0b1129 100%); border:1px solid rgba(255,255,255,.06); position:relative; overflow:hidden}
+    .robot-svg{width:100%; height:100%}
+    .pulse{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:40%; height:40%; border-radius:50%; pointer-events:none; box-shadow:0 0 120px 40px rgba(98,224,255,.12); opacity:.7}
+
+    /* EXPRESSIONS via classes on .robot */
+    .robot[data-state="idle"] .face__mouth{ d:path("M 70 96 Q 96 108 122 96"); }
+    .robot[data-state="listening"] .eye{transform:scale(1.06)}
+    .robot[data-state="speaking"] .face__mouth{ d:path("M 72 96 Q 96 122 120 96"); }
+    .robot[data-state="thinking"] .eye{animation:blink 4s infinite}
+    .robot[data-state="confused"] .face__eyebrow--l{ transform:rotate(-12deg) translate(-6px, -6px)}
+    .robot[data-state="confused"] .face__eyebrow--r{ transform:rotate(12deg) translate(6px, -6px)}
+    @keyframes blink{0%,6%,100%{transform:scaleY(1)} 3%{transform:scaleY(.1)}}
+
+    /* WAVEFORM */
+    .wave{grid-column:1/-1; padding:10px}
+    canvas{width:100%; height:100%; display:block; border-radius:var(--radius); background:linear-gradient(180deg,#0b1020,#0a0f1e)}
+
+    /* A11Y focus helpers */
+    a,button,input,textarea,select{outline-color:var(--focus)}
+
+    /* Responsive */
+    @media (max-width:980px){
+      .app{grid-template-columns:1fr; grid-template-rows:auto 360px 180px}
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <!-- LEFT : Controls + chat -->
+    <section class="stack">
+      <div class="card" aria-labelledby="lab-mic">
+        <h2 id="lab-mic" class="title">Micro & Volume</h2>
+        <div class="row" style="margin-bottom:8px">
+          <button id="btnMic" class="btn" aria-pressed="false" aria-label="Activer le micro">
+            <span class="icon" aria-hidden="true">🎙️</span>
+            <span id="micText">Activer le micro</span>
+          </button>
+        </div>
+        <div class="row">
+          <label for="rngVol" style="min-width:86px">Volume</label>
+          <input id="rngVol" class="range" type="range" min="0" max="1" step="0.01" value="0.9" aria-label="Régler le volume de la voix"/>
+          <output id="outVol" for="rngVol" style="min-width:44px; text-align:right">90%</output>
+        </div>
+      </div>
+
+      <div class="card" aria-labelledby="lab-chat">
+        <h2 id="lab-chat" class="title">Dialogue</h2>
+        <div id="log" class="log" aria-live="polite" aria-relevant="additions"></div>
+        <div class="composer">
+          <input id="txt" type="text" placeholder="Dire quelque chose… (Entrée pour envoyer)" aria-label="Saisir un message"/>
+          <button id="btnSend" class="btn secondary" title="Envoyer" aria-label="Envoyer"><span class="icon">➤</span></button>
+        </div>
+        <p style="margin:.6rem 0 0;color:var(--muted);font-size:12px">Astuce : si la reconnaissance vocale n'est pas dispo dans votre navigateur, tapez votre message au clavier.</p>
+      </div>
+    </section>
+
+    <!-- RIGHT : Robot stage -->
+    <section class="stage panel">
+      <div id="robot" class="robot-wrap robot" data-state="idle" role="img" aria-label="Robot expressif">
+        <div class="pulse" aria-hidden="true"></div>
+        <svg class="robot-svg" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+          <!-- body -->
+          <defs>
+            <linearGradient id="gShell" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#e7f5ff"/>
+              <stop offset="100%" stop-color="#cbd7ff"/>
+            </linearGradient>
+            <linearGradient id="gFace" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#041834"/>
+              <stop offset="100%" stop-color="#09224b"/>
+            </linearGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="b"/>
+              <feMerge>
+                <feMergeNode in="b"/><feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          <!-- ears -->
+          <g class="ear" opacity="0.9">
+            <ellipse cx="40" cy="90" rx="18" ry="22" fill="#10274d" stroke="#1f3d7e"/>
+            <ellipse cx="280" cy="90" rx="18" ry="22" fill="#10274d" stroke="#1f3d7e"/>
+          </g>
+
+          <!-- shell -->
+          <path d="M80,30 h160 a60,60 0 0 1 60,60 v18 q0,20 -30,30 t-190,0 q-30,-10 -30,-30 v-18 a60,60 0 0 1 60,-60 z" fill="url(#gShell)" stroke="#9fb2ff"/>
+          <!-- face screen -->
+          <rect x="85" y="48" width="150" height="84" rx="14" fill="url(#gFace)" stroke="#0e2a6d"/>
+
+          <!-- eyebrows (for emotion) -->
+          <rect class="face__eyebrow--l" x="100" y="56" width="34" height="4" rx="2" fill="#2fd3ff"/>
+          <rect class="face__eyebrow--r" x="186" y="56" width="34" height="4" rx="2" fill="#2fd3ff"/>
+
+          <!-- eyes -->
+          <g filter="url(#glow)">
+            <ellipse class="eye" id="eyeL" cx="125" cy="84" rx="10" ry="12" fill="#6ff0ff"/>
+            <ellipse class="eye" id="eyeR" cx="195" cy="84" rx="10" ry="12" fill="#6ff0ff"/>
+          </g>
+
+          <!-- mouth (morph via CSS d:path) -->
+          <path class="face__mouth" d="M 70 96 Q 96 108 122 96" fill="none" stroke="#8dffb4" stroke-width="6" stroke-linecap="round"/>
+
+          <!-- status glyph (restored) -->
+          <g id="glyph" opacity="0">
+            <circle cx="160" cy="88" r="18" fill="#0c2148" stroke="#1e4b8f"/>
+            <text id="glyphText" x="160" y="94" text-anchor="middle" font-size="16" fill="#8ad9ff" font-weight="700">?</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <!-- BOTTOM : Waveform -->
+    <section class="panel wave" aria-labelledby="lab-wave">
+      <h2 id="lab-wave" class="title" style="padding:12px 12px 0">Waveform temps réel</h2>
+      <div style="height:120px; padding:12px; padding-top:6px">
+        <canvas id="osc" height="96"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ====== Helpers a11y & DOM ======
+    const el = sel => document.querySelector(sel);
+    const logEl = el('#log');
+    function addBubble(text, who='bot'){
+      const div = document.createElement('div');
+      div.className = 'bubble ' + (who==='user' ? 'b-user' : 'b-bot');
+      div.textContent = text;
+      logEl.appendChild(div); logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // ====== Robot expressions ======
+    const robot = el('#robot');
+    const glyph = document.getElementById('glyph');
+    const glyphText = document.getElementById('glyphText');
+    function safeSetAttr(node, attr, val){ if(node && node.setAttribute) node.setAttribute(attr,val); }
+    function safeText(node, val){ if(node) node.textContent = val; }
+
+    function setState(s){
+      safeSetAttr(robot,'data-state',s);
+      const showGlyph = (s==='confused' || s==='thinking');
+      safeSetAttr(glyph,'opacity', showGlyph ? '1' : '0');
+      safeText(glyphText, s==='confused' ? '?' : '…');
+    }
+
+    // ====== Speech Synthesis (TTS) ======
+    const synth = window.speechSynthesis;
+    function speak(text){
+      if(!('speechSynthesis' in window)){ addBubble(text); return; }
+      setState('speaking');
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'fr-FR';
+      u.volume = parseFloat(el('#rngVol').value);
+      u.rate = 1.0; u.pitch = 1.02;
+      u.onend = () => { setState(micActive? 'listening' : 'idle'); };
+      synth.cancel(); synth.speak(u);
+    }
+
+    // ====== Very tiny rule-based bot (replace with your API call) ======
+    async function assistantReply(prompt){
+      const p = prompt.toLowerCase();
+      if(p.includes('bonjour')||p.includes('salut')) return "Bonjour ! Prêt à papoter en mode vocal. Pose-moi une question.";
+      if(p.includes('heure')) return new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) + ", selon mon horloge interne.";
+      if(p.includes('qui es-tu')||p.includes('t\n qui es tu')) return "Je suis un petit robot expressif propulsé par une IA. J'écoute, je réfléchis et je réponds.";
+      if(p.includes('plaisanterie')||p.includes('blague')) return "Pourquoi les développeurs n'aiment-ils pas la nature ? Trop de bugs.";
+      if(p.trim().length < 2) return "Je n'ai rien capté. Tu peux répéter ?";
+      return "Réception : " + prompt + ". (Démo hors-ligne—branchez ici votre backend IA pour une vraie réponse).";
+    }
+
+    // ====== Speech Recognition (ASR) ======
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recog = null, micActive = false;
+    function setupRecog(){
+      if(!SR){ addBubble("Reconnaissance vocale non supportée par ce navigateur. Utilisez le champ texte."); return; }
+      recog = new SR();
+      recog.lang = 'fr-FR';
+      recog.interimResults = true; recog.continuous = true;
+      let finalTranscript = '';
+      recog.onresult = async (e)=>{
+        let interim = '';
+        for(let i=e.resultIndex;i<e.results.length;i++){
+          const res = e.results[i];
+          if(res.isFinal){ finalTranscript += res[0].transcript; }
+          else { interim += res[0].transcript; }
+        }
+        if(finalTranscript){
+          const msg = finalTranscript.trim();
+          addBubble(msg,'user'); finalTranscript='';
+          setState('thinking'); safeText(glyphText,'…');
+          const reply = await assistantReply(msg);
+          addBubble(reply,'bot'); speak(reply);
+        }
+      };
+      recog.onerror = (e)=>{ setState('confused'); safeText(glyphText,'!'); addBubble('ASR: '+e.error); };
+      recog.onend = ()=>{ if(micActive){ try{recog.start();}catch{} } };
+    }
+    setupRecog();
+
+    // ====== Mic button ======
+    const btnMic = el('#btnMic');
+    const micText = el('#micText');
+    btnMic?.addEventListener('click', async ()=>{
+      try{
+        if(!micActive){ await startMic(); }
+        else { await stopMic(); }
+      }catch(err){ addBubble('Micro: '+err.message); }
+    });
+
+    // ====== Volume control ======
+    const rngVol = el('#rngVol');
+    const outVol = el('#outVol');
+    rngVol.addEventListener('input', ()=>{ outVol.value = Math.round(parseFloat(rngVol.value)*100)+'%'; });
+
+    // ====== Chat via texte ======
+    el('#btnSend').addEventListener('click', ()=>sendText());
+    el('#txt').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendText(); } });
+    async function sendText(){
+      const v = el('#txt').value.trim(); if(!v) return;
+      addBubble(v,'user'); el('#txt').value=''; setState('thinking');
+      const reply = await assistantReply(v); addBubble(reply,'bot'); speak(reply);
+    }
+
+    // ====== Web Audio API for waveform (mic) ======
+    let audioCtx, analyser, source, dataArray, rafId, demoOsc;
+    const secureOrigin = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+    async function startMic(){
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.8;
+        source = audioCtx.createMediaStreamSource(stream); source.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        drawWave();
+        if(recog){ try{recog.start();}catch{} }
+        micActive = true; btnMic && btnMic.setAttribute('aria-pressed','true'); micText && (micText.textContent = 'Couper le micro'); setState('listening');
+      }catch(err){
+        addBubble('Micro: '+ (err && err.name ? err.name+': ' : '') + (err.message||'accès refusé'));
+        if(!secureOrigin){ addBubble('Conseil : ouvrez cette page via https:// ou sur http://localhost — les navigateurs bloquent getUserMedia sur les pages non sécurisées.'); }
+        startDemoAudio();
+      }
+    }
+    async function stopMic(){
+      if(source && source.mediaStream){ source.mediaStream.getTracks().forEach(t=>t.stop()); }
+      cancelAnimationFrame(rafId);
+      if(recog){ try{recog.stop();}catch{} }
+      micActive = false; btnMic && btnMic.setAttribute('aria-pressed','false'); micText && (micText.textContent = 'Activer le micro'); setState('idle');
+    }
+
+    function startDemoAudio(){
+      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.85;
+      demoOsc = audioCtx.createOscillator(); demoOsc.type = 'sine'; demoOsc.frequency.value = 220; // A3
+      const gain = audioCtx.createGain(); gain.gain.value = 0.0001; // quasi inaudible, visuel uniquement
+      demoOsc.connect(gain).connect(analyser);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      demoOsc.start(); drawWave();
+    }
+
+    // canvas draw
+    const canvas = document.getElementById('osc');
+    const ctx = canvas.getContext('2d');
+    function drawWave(){
+      const w = canvas.clientWidth, h = canvas.clientHeight; // handle HiDPI
+      const dpr = window.devicePixelRatio || 1; canvas.width = w*dpr; canvas.height = h*dpr; ctx.scale(dpr,dpr);
+      ctx.clearRect(0,0,w,h);
+      if(!analyser || !dataArray) { rafId = requestAnimationFrame(drawWave); return; }
+      analyser.getByteTimeDomainData(dataArray);
+      ctx.lineWidth = 2; ctx.strokeStyle = '#8ad9ff';
+      ctx.beginPath();
+      const slice = w / dataArray.length; let x = 0;
+      for(let i=0;i<dataArray.length;i++){
+        const v = (dataArray[i]-128)/128; const y = h/2 + v * (h*0.4);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); x += slice;
+      }
+      ctx.stroke();
+      ctx.globalAlpha = .12; ctx.fillStyle = '#62e0ff'; ctx.fillRect(0, h/2-2, w, 4); ctx.globalAlpha = 1;
+      rafId = requestAnimationFrame(drawWave);
+    }
+
+    // ====== Runtime self-tests (simple) ======
+    (function selfTests(){
+      try{
+        console.assert(typeof setState === 'function', 'setState doit exister');
+        setState('idle'); setState('thinking'); setState('speaking');
+        console.assert(document.getElementById('glyph'), 'glyph devrait exister après restauration');
+        addBubble('Tests: DOM ok (robot, glyph, boutons présents).', 'bot');
+      }catch(e){ addBubble('Tests: échec → '+e.message); }
+    })();
+
+    // Start idle blink after a short delay
+    setTimeout(()=>setState('thinking'), 1800);
+
+    // If not a secure origin, start demo so preview works
+    if(!secureOrigin){ startDemoAudio(); addBubble('Mode démo : page non sécurisée (aperçu). Waveform OK, micro bloqué tant que vous n\'êtes pas en https ou localhost.'); }
+  </script>
+</body>
+</html>
