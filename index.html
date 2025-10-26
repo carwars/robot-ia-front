@@ -223,13 +223,25 @@
 
     // ====== Very tiny rule-based bot (replace with your API call) ======
     async function assistantReply(prompt){
-      const p = prompt.toLowerCase();
-      if(p.includes('bonjour')||p.includes('salut')) return "Bonjour ! Prêt à papoter en mode vocal. Pose-moi une question.";
-      if(p.includes('heure')) return new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) + ", selon mon horloge interne.";
-      if(p.includes('qui es-tu')||p.includes('t\n qui es tu')) return "Je suis un petit robot expressif propulsé par une IA. J'écoute, je réfléchis et je réponds.";
-      if(p.includes('plaisanterie')||p.includes('blague')) return "Pourquoi les développeurs n'aiment-ils pas la nature ? Trop de bugs.";
-      if(p.trim().length < 2) return "Je n'ai rien capté. Tu peux répéter ?";
-      return "Réception : " + prompt + ". (Démo hors-ligne—branchez ici votre backend IA pour une vraie réponse).";
+      const API_URL = window.BACKEND_URL || 'https://YOUR-APP.vercel.app/api/chat'; // ← remplace par ton URL Vercel
+      try{
+        const ctrl = new AbortController();
+        const timeout = setTimeout(()=>ctrl.abort(), 15000);
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, lang: 'fr-FR' }),
+          signal: ctrl.signal,
+          mode: 'cors'
+        });
+        clearTimeout(timeout);
+        if(!res.ok){ throw new Error('API '+res.status); }
+        const { answer } = await res.json();
+        return answer || 'Réponse vide de l\'API.';
+      }catch(err){
+        console.warn('assistantReply error', err);
+        return `Hmm… API indisponible (${err.message}). Je passe en mode local : ${prompt}`;
+      }
     }
 
     // ====== Speech Recognition (ASR) ======
